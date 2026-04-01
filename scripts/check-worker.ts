@@ -2,13 +2,18 @@
  * Standalone RSS + Newsletter check worker.
  * Runs directly via Node.js without pi/LLM overhead.
  * 
- * Usage: node --import tsx check-worker.ts [--notify]
+ * Usage: tsx check-worker.ts [rss|newsletter] [--notify]
+ * 
+ *   tsx check-worker.ts rss          # RSS feeds only
+ *   tsx check-worker.ts newsletter   # Newsletter only
+ *   tsx check-worker.ts              # Both
  */
 
 import * as db from "../src/db.js";
 import * as fetcher from "../src/fetcher.js";
 import * as mailFetcher from "../src/mail-fetcher.js";
 
+const mode = process.argv[2]; // "rss", "newsletter", or undefined (both)
 const notify = process.argv.includes("--notify");
 
 async function main() {
@@ -18,8 +23,10 @@ async function main() {
   db.getDb();
 
   const feeds = db.listFeeds() as any[];
-  const rssFeeds = feeds.filter(f => f.is_active && f.type !== "newsletter");
-  const nlFeeds = feeds.filter(f => f.is_active && f.type === "newsletter");
+  const checkRss = !mode || mode === "rss";
+  const checkNewsletter = !mode || mode === "newsletter";
+  const rssFeeds = checkRss ? feeds.filter(f => f.is_active && f.type !== "newsletter") : [];
+  const nlFeeds = checkNewsletter ? feeds.filter(f => f.is_active && f.type === "newsletter") : [];
 
   let totalNew = 0;
   let errors = 0;
@@ -53,8 +60,9 @@ async function main() {
     }
   }
 
+  const label = mode || "all";
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-  const summary = `[rss-check] ${rssFeeds.length} RSS + ${nlFeeds.length} newsletter feeds, ${totalNew} new articles, ${errors} errors (${elapsed}s)`;
+  const summary = `[rss-check:${label}] ${rssFeeds.length} RSS + ${nlFeeds.length} newsletter, ${totalNew} new, ${errors} errors (${elapsed}s)`;
 
   if (totalNew > 0 || errors > 0 || notify) {
     console.log(summary);
