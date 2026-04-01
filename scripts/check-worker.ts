@@ -64,8 +64,15 @@ async function main() {
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
   const summary = `[rss-check:${label}] ${rssFeeds.length} RSS + ${nlFeeds.length} newsletter, ${totalNew} new, ${errors} errors (${elapsed}s)`;
 
-  if (totalNew > 0 || errors > 0 || notify) {
-    console.log(summary);
+  // Cleanup: remove read + older than 90 days (skip bookmarked)
+  const cleanup = db.cleanupArticles();
+
+  if (totalNew > 0 || errors > 0 || cleanup.total_deleted > 0 || notify) {
+    const parts = [summary];
+    if (cleanup.total_deleted > 0) {
+      parts.push(`[cleanup] removed ${cleanup.read_deleted} read + ${cleanup.old_deleted} expired (>90d)`);
+    }
+    console.log(parts.join(" | "));
   }
 
   // Exit with error code if there were issues

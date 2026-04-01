@@ -459,6 +459,33 @@ export function listTags() {
   `).all();
 }
 
+// ─── Cleanup ───────────────────────────────────────────────────────────────
+
+export function cleanupArticles(opts?: { maxAgeDays?: number }) {
+  const d = getDb();
+  const maxAge = opts?.maxAgeDays || 90;
+
+  // Delete read articles older than maxAge days (exclude bookmarked)
+  const readResult = d.prepare(`
+    DELETE FROM articles
+    WHERE is_read = 1
+      AND id NOT IN (SELECT article_id FROM bookmarks WHERE article_id IS NOT NULL)
+  `).run();
+
+  // Delete unread articles older than maxAge days (exclude bookmarked)
+  const oldResult = d.prepare(`
+    DELETE FROM articles
+    WHERE published_at < datetime('now', 'localtime', ?)
+      AND id NOT IN (SELECT article_id FROM bookmarks WHERE article_id IS NOT NULL)
+  `).run(`-${maxAge} days`);
+
+  return {
+    read_deleted: readResult.changes,
+    old_deleted: oldResult.changes,
+    total_deleted: readResult.changes + oldResult.changes,
+  };
+}
+
 // ─── Stats ─────────────────────────────────────────────────────────────────
 
 export function getStats() {
