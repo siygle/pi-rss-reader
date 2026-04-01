@@ -29,6 +29,7 @@ function migrate(db: Database.Database): void {
       url                 TEXT NOT NULL UNIQUE,
       site_url            TEXT,
       category            TEXT DEFAULT 'general',
+      type                TEXT DEFAULT 'rss',
       check_interval_min  INTEGER DEFAULT 60,
       last_checked_at     TEXT,
       last_error          TEXT,
@@ -109,6 +110,13 @@ function migrate(db: Database.Database): void {
     // Already exists
   }
 
+  // Migration: add type column if missing (for existing DBs)
+  try {
+    db.prepare(`SELECT type FROM feeds LIMIT 1`).get();
+  } catch {
+    db.exec(`ALTER TABLE feeds ADD COLUMN type TEXT DEFAULT 'rss'`);
+  }
+
   try {
     db.exec(`
       CREATE VIRTUAL TABLE bookmarks_fts USING fts5(
@@ -138,13 +146,14 @@ function migrate(db: Database.Database): void {
 
 // ─── Feed Operations ───────────────────────────────────────────────────────
 
-export function addFeed(name: string, url: string, category?: string, siteUrl?: string) {
+export function addFeed(name: string, url: string, category?: string, siteUrl?: string, type?: string) {
   const db = getDb();
   const stmt = db.prepare(
-    `INSERT INTO feeds (name, url, site_url, category) VALUES (?, ?, ?, ?)`
+    `INSERT INTO feeds (name, url, site_url, category, type) VALUES (?, ?, ?, ?, ?)`
   );
-  const result = stmt.run(name, url, siteUrl || null, category || "general");
-  return { id: result.lastInsertRowid, name, url, category: category || "general" };
+  const feedType = type || "rss";
+  const result = stmt.run(name, url, siteUrl || null, category || "general", feedType);
+  return { id: result.lastInsertRowid, name, url, category: category || "general", type: feedType };
 }
 
 export function removeFeed(id: number) {
@@ -280,6 +289,14 @@ export function markArticlesRead(ids: number[]) {
   const placeholders = ids.map(() => "?").join(",");
   db.prepare(`UPDATE articles SET is_read = 1 WHERE id IN (${placeholders})`).run(...ids);
   return ids.length;
+}
+
+export function getLatestArticleDate(feedId: number): string | null {
+  const db = getDb();
+  const row = db.prepare(
+    `SELECT MAX(published_at) as latest FROM articles WHERE feed_id = ?`
+  ).get(feedId) as any;
+  return row?.latest || null;
 }
 
 export function searchArticles(query: string, limit = 20) {
