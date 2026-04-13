@@ -174,6 +174,9 @@ export default function (pi: ExtensionAPI) {
       "Read RSS articles: list unread, latest, search, or view article detail.",
     promptSnippet:
       "Read RSS articles (unread/latest/search/detail/mark-read)",
+    promptGuidelines: [
+      "When summarizing or digesting RSS articles for the user, include the original article links (URL).",
+    ],
     parameters: Type.Object({
       action: StringEnum([
         "unread",
@@ -447,6 +450,9 @@ export default function (pi: ExtensionAPI) {
     description:
       "Check RSS feeds and newsletter mailbox for new articles. Can check all feeds or a specific one.",
     promptSnippet: "Check RSS feeds and newsletter emails for new articles",
+    promptGuidelines: [
+      "When providing RSS digests or summaries, include the original article links (URL) for each summarized item or topic.",
+    ],
     parameters: Type.Object({
       feed_id: Type.Optional(
         Type.Number({ description: "Specific feed ID to check, omit for all" })
